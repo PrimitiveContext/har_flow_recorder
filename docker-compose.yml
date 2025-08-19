@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  apitool:
+    build: .
+    image: apitool-cli:latest
+    container_name: apitool-cli
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+    volumes:
+      - ./recordings:/app/recordings
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    stdin_open: true
+    tty: true
+    networks:
+      - apitool-network
+    # Uncomment for GUI support on Linux
+    # environment:
+    #   - DISPLAY=${DISPLAY}
+    # volumes:
+    #   - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    # devices:
+    #   - /dev/snd:/dev/snd
+
+  # Optional: Burp Suite proxy container
+  # burp:
+  #   image: appropriate/burp
+  #   container_name: burp-proxy
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - apitool-network
+
+networks:
+  apitool-network:
+    driver: bridge

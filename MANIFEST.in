@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include requirements.txt
+include run.sh
+recursive-include scripts *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.pyc
+recursive-exclude * *.pyo
+recursive-exclude * *.orig
+recursive-exclude scripts/enumeration/.venv *
+global-exclude .git*
+global-exclude .DS_Store

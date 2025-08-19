@@ -1,0 +1,24 @@
+# Core dependencies
+playwright>=1.40.0
+click>=8.1.0
+rich>=13.0.0
+
+# Audio dependencies
+pyaudio>=0.2.11
+openai>=1.0.0
+numpy>=1.24.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Install with:
+# pip install -r requirements.txt
+# playwright install chromium
+
+# For audio on Linux, you may need:
+# sudo apt-get install portaudio19-dev python3-pyaudio
+
+# For OpenAI Whisper API:
+# Set OPENAI_API_KEY environment variable
+# Cost: ~$0.006 per minute of audio

@@ -1,6 +1,0 @@
-pycurl==7.45.3
-playwright>=1.44
-httpx>=0.27.2
-tqdm>=4.66.0
-numpy>=1.24.0
-

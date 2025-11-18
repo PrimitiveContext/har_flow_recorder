@@ -40,6 +40,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MIT License
 - Example configurations
 
+## [1.1.0] - 2025-11-18
+
+### Fixed
+- HAR files now reliably capture response data during multi-page navigation
+- Removed `--start-maximized` flag that caused viewport sizing issues
+
+### Added
+- Real-time response capture in `_handle_response` (status, headers, timestamp)
+- HAR reconstruction fallback when Playwright's built-in export fails
+- New `_reconstruct_har_from_events` function rebuilds HAR from captured events
+
+### Technical Details
+- Playwright's HAR export requires a live page when context closes
+- Page navigation destroys execution context, breaking HAR export
+- Fix captures response data as events occur, then reconstructs HAR if needed
+- Tested: 97.4% response capture rate (602/618 entries)
+
 ## [Unreleased]
 
 ### Planned Features

@@ -381,16 +381,27 @@ class Phase1BrowserRecorder:
         return cookie
     
     def _handle_response(self, response: Response):
-        """Handle response to track cookies and other data"""
+        """Handle response to track cookies, status, headers, and body"""
         # Skip if we're closing
         if self.is_closing:
             return
-            
+
         try:
-            # Track Set-Cookie headers with FULL attributes
+            # Capture full response data for HAR reconstruction
             headers = response.headers
+
+            # Write response event with full data
+            self._write_event('response', {
+                'url': response.url,
+                'status': response.status,
+                'status_text': response.status_text,
+                'headers': dict(headers),
+                'timestamp': datetime.now().isoformat()
+            })
+
+            # Track Set-Cookie headers with FULL attributes
             set_cookies = []
-            
+
             # Get all Set-Cookie headers
             for name, value in headers.items():
                 if name.lower() == 'set-cookie':
@@ -399,14 +410,14 @@ class Phase1BrowserRecorder:
                     cookie_data['url'] = response.url
                     cookie_data['status'] = response.status
                     set_cookies.append(cookie_data)
-                    
+
                     # Track in timeline
                     self.cookie_timeline.append({
                         'event': 'cookie_set',
                         'timestamp': datetime.now().isoformat(),
                         'cookie': cookie_data
                     })
-            
+
             if set_cookies:
                 self._write_event('cookie_set', {
                     'url': response.url,
@@ -414,7 +425,7 @@ class Phase1BrowserRecorder:
                     'cookies': set_cookies
                 })
                 logger.debug(f"Tracked {len(set_cookies)} cookies from {response.url}")
-            
+
         except Exception as e:
             logger.error(f"Failed to handle response: {e}")
     
@@ -619,14 +630,13 @@ class Phase1BrowserRecorder:
                 "headless": headless,
                 "args": [
                     # EXISTING FLAGS
-                    "--start-maximized",
                     "--ignore-certificate-errors",
                     "--disable-web-security",
                     "--allow-running-insecure-content",
                     "--disable-features=IsolateOrigins,site-per-process",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
-                    
+
                     # NEW SECURITY BYPASS FLAGS FOR COMPLETE TESTING
                     "--allow-insecure-localhost",  # Critical for testing local APIs with self-signed certs
                     "--disable-features=SameSiteByDefaultCookies",  # Allow cross-site cookies for CSRF testing
@@ -882,33 +892,25 @@ class Phase1BrowserRecorder:
                 self.event_log_file.close()
                 self.event_log_file = None
             
-            # Try to save HAR by closing page first (more reliable)
-            har_saved = False
-            if self.page:
-                try:
-                    # Close page first - this often triggers HAR save
-                    await self.page.close()
-                    self.page = None
-                    har_saved = True
-                except Exception as e:
-                    logger.debug(f"Page close error: {e}")
-            
-            # Close context to finalize HAR - with error handling
+            # Close context to finalize HAR - let Playwright handle page cleanup
+            # Don't manually close pages - this can interfere with HAR finalization
             if self.context:
                 try:
-                    # Give it a moment for HAR to write if page closed successfully
-                    if har_saved:
-                        await asyncio.sleep(0.5)
                     await self.context.close()
                     logger.debug("Context closed successfully, HAR should be saved")
+                    # Give Playwright time to write HAR file to disk
+                    await asyncio.sleep(1.0)
                 except Exception as e:
                     logger.debug(f"Context close error (HAR may not be saved): {e}")
-                    # Try to at least create a minimal HAR file with what we have
-                    if not (self.session_dir / "recording.har").exists():
-                        logger.warning("HAR file was not saved due to context close error")
                 finally:
                     self.context = None
                     self.page = None
+
+            # ALWAYS check if HAR exists and reconstruct if missing
+            if self.session_dir and not (self.session_dir / "recording.har").exists():
+                logger.warning("HAR file was not saved by Playwright")
+                logger.info("Reconstructing HAR from captured events...")
+                self._reconstruct_har_from_events()
             
             # Write metadata summary
             metadata = {
@@ -969,6 +971,110 @@ class Phase1BrowserRecorder:
                 "error": str(e)
             }
     
+    def _reconstruct_har_from_events(self):
+        """Reconstruct HAR file from captured events when Playwright's HAR export fails"""
+        try:
+            events_file = self.session_dir / "events.ndjson"
+            if not events_file.exists():
+                logger.error("Cannot reconstruct HAR: events.ndjson not found")
+                return
+
+            # Read all request and response events
+            requests = []
+            responses = {}  # Map URL to response data
+            with open(events_file, 'r') as f:
+                for line in f:
+                    try:
+                        event = json.loads(line)
+                        if event.get('type') == 'request':
+                            requests.append(event)
+                        elif event.get('type') == 'response':
+                            # Store response by URL for matching
+                            url = event.get('data', {}).get('url', '')
+                            responses[url] = event.get('data', {})
+                    except json.JSONDecodeError:
+                        continue
+
+            # Build HAR structure
+            har = {
+                "log": {
+                    "version": "1.2",
+                    "creator": {
+                        "name": "har_flow_recorder_fallback",
+                        "version": "1.0"
+                    },
+                    "entries": []
+                }
+            }
+
+            # Convert each request event to HAR entry
+            for req_event in requests:
+                data = req_event.get('data', {})
+                url = data.get('url', '')
+
+                # Find matching response
+                resp_data = responses.get(url, {})
+
+                entry = {
+                    "startedDateTime": req_event.get('timestamp', ''),
+                    "time": 0,
+                    "request": {
+                        "method": data.get('method', 'GET'),
+                        "url": url,
+                        "httpVersion": "HTTP/1.1",
+                        "headers": [
+                            {"name": k, "value": v}
+                            for k, v in data.get('headers', {}).items()
+                        ],
+                        "queryString": [],
+                        "cookies": [],
+                        "headersSize": -1,
+                        "bodySize": -1
+                    },
+                    "response": {
+                        "status": resp_data.get('status', 0),
+                        "statusText": resp_data.get('status_text', ''),
+                        "httpVersion": "HTTP/1.1",
+                        "headers": [
+                            {"name": k, "value": v}
+                            for k, v in resp_data.get('headers', {}).items()
+                        ],
+                        "cookies": [],
+                        "content": {
+                            "size": 0,
+                            "mimeType": resp_data.get('headers', {}).get('content-type', '')
+                        },
+                        "redirectURL": "",
+                        "headersSize": -1,
+                        "bodySize": -1
+                    },
+                    "cache": {},
+                    "timings": {
+                        "send": 0,
+                        "wait": 0,
+                        "receive": 0
+                    }
+                }
+
+                # Add POST data if present
+                if data.get('post_data'):
+                    entry["request"]["postData"] = {
+                        "mimeType": "application/x-www-form-urlencoded",
+                        "text": data['post_data']
+                    }
+
+                har["log"]["entries"].append(entry)
+
+            # Write HAR file
+            har_path = self.session_dir / "recording.har"
+            with open(har_path, 'w') as f:
+                json.dump(har, f, indent=2)
+
+            logger.info(f"Successfully reconstructed HAR with {len(requests)} requests and {len(responses)} responses")
+
+        except Exception as e:
+            logger.error(f"Failed to reconstruct HAR: {e}")
+
     async def navigate_to(self, url: str) -> bool:
         """Navigate to a URL"""
         logger.info(f"Navigating to {url}")

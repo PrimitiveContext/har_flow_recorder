@@ -76,7 +76,11 @@ class Phase1BrowserRecorder:
         # Cookie lifecycle tracking
         self.cookie_timeline = []
         self.cookie_mutations = {}
-        
+
+        # Connection health tracking
+        self.last_event_time = None
+        self.connection_healthy = True
+
         # Ensure logs directory exists
         Path('./logs').mkdir(parents=True, exist_ok=True)
         
@@ -106,10 +110,44 @@ class Phase1BrowserRecorder:
             # Write as single line JSON
             self.event_log_file.write(json.dumps(event) + '\n')
             self.event_log_file.flush()  # Ensure immediate write
+            self.last_event_time = time.time()  # Track for health monitoring
             logger.debug(f"Wrote event {event['id']}: {event_type}")
         except Exception as e:
             logger.error(f"Failed to write event: {e}")
-    
+
+    async def check_connection_health(self) -> bool:
+        """
+        Check if browser connection is still alive.
+        Returns True if healthy, False if connection is dead.
+        """
+        if self.is_closing or not self.is_recording:
+            return True  # Don't report unhealthy during shutdown
+
+        try:
+            # Check if page exists and is not closed
+            if not self.page:
+                logger.error("Health check failed: No page instance")
+                self.connection_healthy = False
+                return False
+
+            if self.page.is_closed():
+                logger.error("Health check failed: Page is closed")
+                self.connection_healthy = False
+                return False
+
+            # Try to evaluate a simple expression to verify connection
+            await self.page.evaluate("() => true", timeout=5000)
+            self.connection_healthy = True
+            return True
+
+        except Exception as e:
+            error_msg = str(e)
+            # Only log as error if it's not a known shutdown condition
+            if "Target closed" not in error_msg and "Connection closed" not in error_msg:
+                logger.error(f"Health check failed: {e}")
+            self.connection_healthy = False
+            return False
+
     def _store_blob(self, content: bytes) -> str:
         """Store large content as blob, return hash reference"""
         if not content:

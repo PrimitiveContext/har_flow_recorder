@@ -183,7 +183,9 @@ def record(project: str, user: Optional[str], audio: bool, description: Optional
             # Save terminal settings
             old_settings = termios.tcgetattr(sys.stdin)
             stop_buffer = ""
-            
+            last_health_check = time.time()
+            health_check_interval = 10  # Check every 10 seconds
+
             try:
                 # Set terminal to raw mode for non-blocking input
                 tty.setcbreak(sys.stdin.fileno())
@@ -214,7 +216,14 @@ def record(project: str, user: Optional[str], audio: bool, description: Optional
                             # Use raw print with ANSI codes for clean updates
                             print(f"\033[2K\r\033[36m{status}\033[0m", end="", flush=True)
                             last_status_update = current_time
-                        
+
+                        # Periodic connection health check
+                        if current_time - last_health_check >= health_check_interval:
+                            if not await browser_recorder.check_connection_health():
+                                print(f"\033[2K\r\033[31m⚠ CONNECTION LOST - Browser connection died! Events stopped being captured.\033[0m")
+                                print(f"\n\033[33mRecording will be saved with data captured so far. Type 'stop' to save.\033[0m", flush=True)
+                            last_health_check = current_time
+
                         # Small delay to prevent CPU spinning and check recording_active frequently
                         await asyncio.sleep(0.05)  # Check 20 times per second for faster response
                         

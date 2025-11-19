@@ -57,6 +57,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix captures response data as events occur, then reconstructs HAR if needed
 - Tested: 97.4% response capture rate (602/618 entries)
 
+## [1.2.0] - 2025-11-18
+
+### Fixed
+- Recording now detects browser connection drops instead of silently failing
+- Users are immediately notified when connection is lost so they can save partial data
+
+### Added
+- Connection health monitoring via periodic `check_connection_health()` calls
+- Health check runs every 10 seconds during recording
+- Clear red warning message when connection dies
+- `last_event_time` and `connection_healthy` tracking in recorder
+
+### Root Cause
+- Playwright event listeners silently stop firing when browser connection drops
+- CLI timer kept running but no new events were captured
+- No mechanism existed to detect this condition
+- Fix actively polls browser with `page.evaluate()` to verify connection is alive
+
 ## [Unreleased]
 
 ### Planned Features

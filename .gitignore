@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+
+# Recordings and logs
+recordings/
+logs/
+*.log
+*.har
+*.ndjson
+*.wav
+
+# Project-specific recordings (any directory with recordings)
+*-ai-chatbot/
+macys-ai-chatbot/
+
+# Test files
+test_*.py
+*_test.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp

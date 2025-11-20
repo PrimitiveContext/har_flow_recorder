@@ -136,7 +136,7 @@ class Phase1BrowserRecorder:
                 return False
 
             # Try to evaluate a simple expression to verify connection
-            await self.page.evaluate("() => true", timeout=5000)
+            await asyncio.wait_for(self.page.evaluate("() => true"), timeout=5.0)
             self.connection_healthy = True
             return True
 

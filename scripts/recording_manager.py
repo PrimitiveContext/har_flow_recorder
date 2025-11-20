@@ -37,11 +37,11 @@ class RecordingManager:
         
         if project:
             # Project-specific recordings directory
-            self.recordings_dir = Path(f"./{project}/recordings")
+            self.recordings_dir = Path(f"./recordings/{project}")
             self.recordings_dir.mkdir(parents=True, exist_ok=True)
         else:
-            # Base directory for project listing
-            self.recordings_dir = Path(".")
+            # Base directory for project listing (recordings root)
+            self.recordings_dir = Path("./recordings")
         
         elapsed = (time.time() - start_time) * 1000
         logger.info(f"Completed initialization in {elapsed:.2f}ms")
@@ -60,18 +60,17 @@ class RecordingManager:
         
         # Scan for existing projects
         projects = []
-        for item in Path(".").iterdir():
-            if item.is_dir() and not item.name.startswith('.') and not item.name.startswith('venv'):
-                # Check if it has recordings directory
-                recordings_dir = item / "recordings"
-                if recordings_dir.exists() or (item / "metadata.json").exists():
+        recordings_base = Path("./recordings")
+        if recordings_base.exists():
+            for item in recordings_base.iterdir():
+                if item.is_dir() and not item.name.startswith('.'):
                     projects.append(item.name)
-        
+
         if projects:
             self.console.print("\n[bold]Existing Projects:[/bold]")
             for i, project in enumerate(projects, 1):
                 # Get recording count
-                recordings_dir = Path(f"./{project}/recordings")
+                recordings_dir = Path(f"./recordings/{project}")
                 recording_count = 0
                 if recordings_dir.exists():
                     for user_dir in recordings_dir.iterdir():

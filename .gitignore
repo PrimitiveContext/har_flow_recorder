@@ -19,13 +19,6 @@ build/
 recordings/
 logs/
 *.log
-*.har
-*.ndjson
-*.wav
-
-# Project-specific recordings (any directory with recordings)
-*-ai-chatbot/
-macys-ai-chatbot/
 
 # Test files
 test_*.py
